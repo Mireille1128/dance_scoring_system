@@ -21,8 +21,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://github.com/Mireille1128/dance_scoring_system#readme',
-        'Report a bug': "https://github.com/Mireille1128/dance_scoring_system/issues/1#issue-3800758238",
+        'Get Help': 'https://github.com/Mireille1128/dance-standard-comparison.wiki.git',
+        'Report a bug': "https://github.com/Mireille1128/dance-standard-comparison/issues/1#issue-3800758238",
         'About': """
         # 舞蹈标准对比学习系统 v1.0
 
@@ -97,7 +97,7 @@ def save_uploaded_file(uploaded_file, temp_dir):
 
 
 def extract_video_thumbnail(video_path):
-    """提取视频缩略图,封面图"""
+    """提取视频缩略图"""
     try:
         cap = cv2.VideoCapture(video_path)
         if cap.isOpened():
@@ -153,7 +153,7 @@ st.markdown("---")
 temp_dir = tempfile.mkdtemp()
 
 # ==================== 步骤1：标准视频上传 ====================
-st.header("📹 步骤1：上传标准舞蹈教学视频")
+st.header("📚 步骤1：上传标准舞蹈教学视频")
 
 col_standard1, col_standard2 = st.columns([2, 1])
 
@@ -166,39 +166,42 @@ with col_standard1:
     )
 
     if standard_file:
-        standard_path = save_uploaded_file(standard_file, temp_dir)
-        if standard_path:
-            # 加载标准视频
-            result = scorer.load_standard_video(standard_path)
+        with st.spinner("正在处理标准视频..."):
+            standard_path = save_uploaded_file(standard_file, temp_dir)
+            if standard_path:
+                # 加载标准视频
+                result = scorer.load_standard_video(standard_path)
 
-            if result['success']:
-                st.session_state.standard_loaded = True
-                st.session_state.standard_video_path = standard_path
+                if result['success']:
+                    st.session_state.standard_loaded = True
+                    st.session_state.standard_video_path = standard_path
+                    st.success("✅ 标准视频加载成功！")
 
-                # 显示视频信息
-                video_info = result['video_info']
-                st.info(f"""
-                **标准视频信息：**
-                - 时长: {video_info['duration']:.1f}秒
-                - 帧率: {video_info['fps']:.1f} FPS
-                - 分析帧数: {video_info['analyzed_frames']}帧
-                """)
-            else:
-                st.error(f"❌ 标准视频加载失败: {result.get('error', '未知错误')}")
+                    # 显示视频信息
+                    video_info = result['video_info']
+                    st.info(f"""
+                    **视频信息：**
+                    - 时长: {video_info['duration']:.1f}秒
+                    - 帧率: {video_info['fps']:.1f} FPS
+                    - 分析帧数: {video_info['analyzed_frames']}帧
+                    """)
+                else:
+                    st.error(f"❌ 标准视频加载失败: {result.get('error', '未知错误')}")
 
 with col_standard2:
     if st.session_state.standard_loaded:
         # 显示标准视频缩略图
         thumbnail = extract_video_thumbnail(st.session_state.standard_video_path)
         if thumbnail is not None:
-            st.image(thumbnail, caption="标准视频", use_container_width=True)
+            st.image(thumbnail, caption="标准视频预览")
         else:
-            st.info("无法生成标准视频")
-        st.metric("状态：", "🎉 标准视频就绪")
+            st.info("无法生成视频预览")
+
+        st.metric("状态", "✅ 已加载", "标准视频就绪")
 
 # ==================== 步骤2：个人视频上传 ====================
 st.markdown("---")
-st.header("📹 步骤2：上传个人舞蹈练习视频")
+st.header("🎬 步骤2：上传个人舞蹈练习视频")
 
 if not st.session_state.standard_loaded:
     st.warning("⚠️ 请先上传标准视频")
@@ -217,161 +220,65 @@ with col_personal1:
     personal_video_path = None
 
     if personal_file:
-        personal_path = save_uploaded_file(personal_file, temp_dir)
-        if personal_path:
-            personal_video_path = personal_path
+        with st.spinner("正在处理个人视频..."):
+            personal_path = save_uploaded_file(personal_file, temp_dir)
+            if personal_path:
+                personal_video_path = personal_path
 
-            # 显示视频信息
-            info = get_video_info(personal_path)
-            if info:
-                st.info(f"""
-                **用户视频信息：**
-                - 分辨率: {info['分辨率']}
-                - 时长: {info['时长']}
-                - 帧率: {info['帧率']}
-                """)
+                # 显示视频信息
+                info = get_video_info(personal_path)
+                if info:
+                    st.info(f"""
+                    **您的视频信息：**
+                    - 分辨率: {info['分辨率']}
+                    - 时长: {info['时长']}
+                    - 帧率: {info['帧率']}
+                    """)
 
 with col_personal2:
     if personal_video_path:
         # 显示个人视频缩略图
         thumbnail = extract_video_thumbnail(personal_video_path)
         if thumbnail is not None:
-            st.image(thumbnail, caption="用户视频", use_container_width=True)
+            st.image(thumbnail, caption="您的视频预览")
         else:
             st.info("无法生成视频预览")
-
-        st.metric("状态：", "🎉 用户视频就绪")
-
 
 # ==================== 步骤3：开始对比分析 ====================
 if personal_video_path and st.session_state.standard_loaded:
     st.markdown("---")
     st.header("🔍 步骤3：开始对比分析")
 
-    # 显示准备状态
-    st.info("""
-    ### 📋 分析准备就绪
-    - ✅ 标准视频已加载
-    - ✅ 个人视频已上传
-    - 🎯 点击下方按钮开始对比分析
-    """)
+    col_analyze1, col_analyze2, col_analyze3 = st.columns([1, 2, 1])
 
-    # 创建三列让按钮居中
-    col1, col2, col3 = st.columns([1, 2, 1])
-
-    with col2:
-        # 分析按钮
+    with col_analyze2:
         analyze_button = st.button(
             "🎯 开始智能对比分析",
             type="primary",
-            use_container_width=True,
-            help="开始对比您的舞蹈动作与标准动作"
+            use_container_width=True
         )
 
-        # 预估时间
-        video_info = get_video_info(personal_video_path)
-        if video_info:
-            duration = float(video_info['时长'].replace('秒', ''))
-            if duration > 60:
-                st.warning(f"⚠️ 您的视频较长 ({duration}秒)，分析可能需要1-2分钟")
-
-    # 如果点击了分析按钮
     if analyze_button:
-        # 创建进度显示区域
-        progress_placeholder = st.empty()
-        status_placeholder = st.empty()
-        result_placeholder = st.empty()
-
-        with progress_placeholder.container():
-            # 进度条
+        with st.spinner("正在分析您的舞蹈动作，请稍候..."):
+            # 显示进度
             progress_bar = st.progress(0)
-            status_text = status_placeholder.empty()
 
-            # 取消按钮（在侧边）
-            cancel_col1, cancel_col2 = st.columns([4, 1])
-            with cancel_col2:
-                cancel_button = st.button("取消分析", type="secondary")
+            # 模拟分析过程
+            for i in range(100):
+                time.sleep(0.01)
+                progress_bar.progress(i + 1)
 
-            # 开始分析
-            try:
-                # 阶段1: 准备阶段 (0-15%)
-                status_text.text("准备分析环境...")
-                progress_bar.progress(15)
-                time.sleep(0.5)
+            # 执行对比分析
+            evaluation_result = scorer.evaluate_student_video(personal_video_path)
 
-                if cancel_button:
-                    st.warning("分析已取消")
-                    st.stop()
+            progress_bar.empty()
 
-                # 阶段2: 加载个人视频 (15-30%)
-                status_text.text("加载您的舞蹈视频...")
-                progress_bar.progress(30)
-                time.sleep(0.5)
-
-                # 阶段3: 提取动作特征 (30-60%)
-                status_text.text("提取舞蹈动作关键点...")
-                for i in range(30, 61):
-                    if cancel_button:
-                        st.warning("分析已取消")
-                        st.stop()
-                    progress_bar.progress(i)
-                    time.sleep(0.02)
-
-                # 阶段4: 对比分析 (60-85%)
-                status_text.text("对比标准动作...")
-                for i in range(61, 86):
-                    if cancel_button:
-                        st.warning("分析已取消")
-                        st.stop()
-                    progress_bar.progress(i)
-                    time.sleep(0.02)
-
-                # 阶段5: 计算评分 (85-95%)
-                status_text.text("计算综合评分...")
-                progress_bar.progress(95)
-                time.sleep(0.5)
-
-                # 阶段6: 执行真正的分析
-                status_text.text("生成分析报告...")
-                evaluation_result = scorer.evaluate_student_video(personal_video_path)
-                progress_bar.progress(100)
-
-                # 清理进度显示
-                time.sleep(0.5)
-                progress_placeholder.empty()
-                status_placeholder.empty()
-
-                # 显示结果
-                with result_placeholder:
-                    if evaluation_result['success']:
-                        # 保存结果
-                        st.session_state.evaluation_result = evaluation_result
-
-                        # 显示成功
-                        st.success("✅ 舞蹈分析完成！")
-                        st.balloons()
-
-                        # 显示简要结果
-                        if 'overall_score' in evaluation_result:
-                            st.metric("综合评分",
-                                      f"{evaluation_result['overall_score']:.1f}分",
-                                      delta_color="off")
-
-                        # 跳转到结果页面的按钮
-                        if st.button("📄 查看详细分析报告", type="primary"):
-                            # 这里可以跳转到结果页面
-                            st.session_state.show_results = True
-                            st.rerun()
-
-                    else:
-                        st.error(f"❌ 分析失败: {evaluation_result.get('error', '未知错误')}")
-
-                        # 重试按钮
-                        if st.button("🔄 重新尝试分析"):
-                            st.rerun()
-
-            except Exception as e:
-                st.error(f"❌ 分析过程中出错: {str(e)}")
+            if evaluation_result['success']:
+                st.session_state.evaluation_result = evaluation_result
+                st.success("✅ 分析完成！")
+                st.balloons()
+            else:
+                st.error(f"❌ 分析失败: {evaluation_result.get('error', '未知错误')}")
 
 # ==================== 步骤4：显示分析结果 ====================
 if st.session_state.evaluation_result:
