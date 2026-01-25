@@ -29,6 +29,7 @@ class FrameAnalysis:
     position_score: float  # 位置得分
     movement_score: float  # 动作得分
     posture_score: float  # 姿势得分
+    expression_score: float  # 表情得分
     landmarks: List  # 关键点数据
 
 
@@ -402,6 +403,7 @@ class StandardDanceScorer:
             'position_errors': [],
             'movement_errors': [],
             'posture_errors': [],
+            'expression_errors': [],
             'frame_comparisons': [],
             'worst_frames': []
         }
@@ -422,6 +424,7 @@ class StandardDanceScorer:
         position_scores = []
         movement_scores = []
         posture_scores = []
+        expression_scores = []
 
         for i in range(max_comparisons):
             student_frame = student_frames[i]
@@ -439,12 +442,14 @@ class StandardDanceScorer:
             position_score = self._calculate_position_score(student_landmarks, standard_landmarks)
             movement_score = self._calculate_movement_score(student_landmarks, standard_landmarks)
             posture_score = self._calculate_posture_score(student_landmarks, standard_landmarks)
+            expression_score = self._calculate_expression_score(student_landmarks, standard_landmarks)
 
             # 记录分数
             timing_scores.append(timing_score)
             position_scores.append(position_score)
             movement_scores.append(movement_score)
             posture_scores.append(posture_score)
+            expression_scores.append(expression_score)
 
             # 记录帧对比
             frame_comparison = {
@@ -454,7 +459,9 @@ class StandardDanceScorer:
                 'position_score': position_score,
                 'movement_score': movement_score,
                 'posture_score': posture_score,
-                'overall_score': (timing_score + position_score + movement_score + posture_score) / 4
+                'expression_score': expression_score,
+                'overall_score': (timing_score + position_score + movement_score +
+                                  posture_score + expression_score) / 5
             }
 
             comparison['frame_comparisons'].append(frame_comparison)
@@ -473,7 +480,8 @@ class StandardDanceScorer:
             'timing': np.mean(timing_scores) if timing_scores else 75,
             'position': np.mean(position_scores) if position_scores else 75,
             'movement': np.mean(movement_scores) if movement_scores else 75,
-            'posture': np.mean(posture_scores) if posture_scores else 75
+            'posture': np.mean(posture_scores) if posture_scores else 75,
+            'expression': np.mean(expression_scores) if expression_scores else 75
         }
 
         # 找出最差的5帧
@@ -660,6 +668,79 @@ class StandardDanceScorer:
         else:
             return 60
 
+    def _calculate_expression_score(self, student_landmarks: List, standard_landmarks: List) -> float:
+        """
+        计算表情与情感得分
+
+        Args:
+            student_landmarks: 学生关键点
+            standard_landmarks: 标准关键点
+
+        Returns:
+            float: 表情得分
+        """
+        # 基于面部关键点的简化表情识别
+        if len(student_landmarks) >= 25:
+            return self._estimate_face_expression_simple(student_landmarks)
+
+        # 如果没有面部关键点，返回默认分
+        return 75.0
+
+    def _estimate_face_expression_simple(self, landmarks: List) -> float:
+        """
+        简化版面部表情估计
+        基于头部姿态和眼睛/嘴巴关键点
+        """
+        try:
+            if len(landmarks) < 25:
+                return 75.0
+
+            # 1. 头部姿态检测（简化版）
+            # 使用鼻子和耳朵的位置判断头部朝向
+            nose = landmarks[0]  # 鼻子
+            left_ear = landmarks[7] if len(landmarks) > 7 else (0.3, 0.5, 0)
+            right_ear = landmarks[8] if len(landmarks) > 8 else (0.7, 0.5, 0)
+
+            # 计算头部正面程度（假设标准是正面）
+            head_center_x = (left_ear[0] + right_ear[0]) / 2
+            head_offset = abs(nose[0] - head_center_x)
+
+            # 头部偏移越小，说明越正面，分数越高
+            if head_offset < 0.02:
+                head_score = 95
+            elif head_offset < 0.05:
+                head_score = 85
+            elif head_offset < 0.08:
+                head_score = 75
+            elif head_offset < 0.12:
+                head_score = 65
+            else:
+                head_score = 55
+
+            # 2. 肩部紧张程度（间接反映表情）
+            # 肩部越高通常表示越紧张
+            left_shoulder = landmarks[11]
+            right_shoulder = landmarks[12]
+
+            shoulder_height_avg = (left_shoulder[1] + right_shoulder[1]) / 2
+
+            if shoulder_height_avg < 0.3:  # 肩部较低，放松状态
+                shoulder_score = 90
+            elif shoulder_height_avg < 0.4:
+                shoulder_score = 80
+            elif shoulder_height_avg < 0.5:
+                shoulder_score = 70
+            else:  # 肩部较高，紧张状态
+                shoulder_score = 60
+
+            # 综合得分（头部姿态权重60%，肩部放松度40%）
+            expression_score = head_score * 0.6 + shoulder_score * 0.4
+
+            return min(100, max(30, expression_score))
+
+        except Exception:
+            return 75.0  # 默认分
+
     def _calculate_final_score(self, comparison: Dict) -> Dict:
         """计算最终分数"""
         avg_scores = comparison['average_scores']
@@ -702,6 +783,10 @@ class StandardDanceScorer:
         if avg_scores.get('posture', 100) < 70:
             suggestions.append("🧘 **姿势纠正**：保持脊柱挺直，注意肩膀和骨盆的水平，加强核心力量训练")
 
+        # 新增表情建议
+        if avg_scores.get('expression', 100) < 70:
+            suggestions.append("😊 **表情表现**：舞蹈不仅是动作，更是情感表达。放松面部肌肉，根据舞蹈风格展现相应的表情")
+
         # 添加一般建议
         if len(suggestions) == 0:
             suggestions.append("🎉 **表现优秀**！继续保持练习，注意细节的完美呈现")
@@ -725,7 +810,8 @@ class StandardDanceScorer:
             'timing': '节奏时机',
             'position': '位置方向',
             'movement': '动作幅度',
-            'posture': '姿势标准'
+            'posture': '姿势标准',
+            'expression': '表情表现'
         }
 
         for category, score in sorted_categories:
@@ -762,6 +848,11 @@ class StandardDanceScorer:
                 'high': '姿势非常标准，身体线条优美',
                 'medium': '姿势基本正确，可更挺拔',
                 'low': '姿势需要纠正，注意身体对齐'
+            },
+            'expression': {
+                'high': '表情丰富自然，情感表达到位',
+                'medium': '表情基本合格，可更有感染力',
+                'low': '表情不足，需要加强情感表达'
             }
         }
 
@@ -789,6 +880,8 @@ class StandardDanceScorer:
             issues.append('动作变形')
         if frame_comparison['posture_score'] < 60:
             issues.append('姿势不正')
+        if frame_comparison.get('expression_score', 75) < 60:
+            issues.append('表情不足')
 
         return issues if issues else ['表现良好']
 
