@@ -807,10 +807,10 @@ class StandardDanceScorer:
         )[:3]
 
         category_names = {
-            'timing': '节奏时机',
-            'position': '位置方向',
+            'timing': '节奏与时机',
+            'position': '位置与方向',
             'movement': '动作幅度',
-            'posture': '姿势标准',
+            'posture': '姿势标准度',
             'expression': '表情表现'
         }
 
