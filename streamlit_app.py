@@ -77,6 +77,8 @@ if 'standard_video_path' not in st.session_state:
     st.session_state.standard_video_path = None
 if 'evaluation_result' not in st.session_state:
     st.session_state.evaluation_result = None
+if 'show_celebration' not in st.session_state:
+    st.session_state.show_celebration = False
 
 
 # ==================== 辅助函数 ====================
@@ -114,7 +116,7 @@ def extract_video_thumbnail(video_path):
 
 
 def get_video_info(video_path):
-    """获取视频信息"""
+    """获取用户视频信息"""
     try:
         cap = cv2.VideoCapture(video_path)
         if cap.isOpened():
@@ -242,7 +244,6 @@ with col_personal2:
 
         st.metric("状态：", "🎉 用户视频就绪")
 
-
 # ==================== 步骤3：开始对比分析 ====================
 if personal_video_path and st.session_state.standard_loaded:
     st.markdown("---")
@@ -277,6 +278,9 @@ if personal_video_path and st.session_state.standard_loaded:
 
     # 如果点击了分析按钮
     if analyze_button:
+        # 设置庆祝标志
+        st.session_state.show_celebration = True
+
         # 创建进度显示区域
         progress_placeholder = st.empty()
         status_placeholder = st.empty()
@@ -349,19 +353,12 @@ if personal_video_path and st.session_state.standard_loaded:
 
                         # 显示成功
                         st.success("✅ 舞蹈分析完成！")
-                        st.balloons()
 
                         # 显示简要结果
                         if 'overall_score' in evaluation_result:
                             st.metric("综合评分",
                                       f"{evaluation_result['overall_score']:.1f}分",
                                       delta_color="off")
-
-                        # 跳转到结果页面的按钮
-                        if st.button("📄 查看详细分析报告", type="primary"):
-                            # 这里可以跳转到结果页面
-                            st.session_state.show_results = True
-                            st.rerun()
 
                     else:
                         st.error(f"❌ 分析失败: {evaluation_result.get('error', '未知错误')}")
@@ -375,10 +372,25 @@ if personal_video_path and st.session_state.standard_loaded:
 
 # ==================== 步骤4：显示分析结果 ====================
 if st.session_state.evaluation_result:
+    # 显示庆祝动画（如果设置了庆祝标志）
+    if st.session_state.show_celebration:
+        # 庆祝动画
+        st.balloons()
+        # 重置标志
+        st.session_state.show_celebration = False
+
     result = st.session_state.evaluation_result
 
     st.markdown("---")
     st.header("📊 分析结果报告")
+
+    # 添加庆祝横幅
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;'>
+        <h2 style='color: white; margin: 0;'>🎉 恭喜！舞蹈分析完成！ 🎉</h2>
+        <p style='margin: 10px 0 0 0; font-size: 18px;'>以下是您的详细分析报告</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     # 总体分数卡片
     col_overall1, col_overall2, col_overall3 = st.columns(3)
@@ -386,23 +398,23 @@ if st.session_state.evaluation_result:
     with col_overall1:
         st.metric(
             label="🏆 综合得分",
-            value=f"{result['overall_score']:.1f}",
-            delta=result['grade']
+            value=f"{result['overall_score']:.1f}"
+
         )
 
     with col_overall2:
         st.metric(
             label="📈 表现等级",
-            value=result['grade'].split(' ')[0],
-            delta="详细分析见下方"
+            value=result['grade'].split(' ')[0]
+
         )
 
     with col_overall3:
         duration = result['student_info']['duration']
         st.metric(
             label="⏱️ 视频时长",
-            value=f"{duration:.1f}秒",
-            delta="已分析"
+            value=f"{duration:.1f}秒"
+
         )
 
     # 分数分解雷达图
